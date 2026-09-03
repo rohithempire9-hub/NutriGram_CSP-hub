@@ -1,0 +1,6 @@
+{
+  "name": "NutriGram - Village School Nutrition Dashboard",
+  "description": "Community service child nutrition tracker monitoring weekly egg, milk, and vegetable consumption, BMI health status, and growth interventions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
