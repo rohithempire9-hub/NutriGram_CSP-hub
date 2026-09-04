@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Sparkles, Egg, Milk, Salad } from 'lucide-react';
-import { ChildRecord, Gender, MilkIntake, VegetableIntake } from '../types';
+import { ChildRecord, Gender, MilkIntake, VegetableIntake, Mandal } from '../types';
 import { analyzeChild, calculateBMI } from '../utils/nutritionCalculations';
 
 interface ChildModalProps {
@@ -8,6 +8,7 @@ interface ChildModalProps {
   onClose: () => void;
   onSave: (childData: Omit<ChildRecord, 'id' | 'createdAt'>, existingId?: string) => void;
   childToEdit?: ChildRecord | null;
+  mandals?: Mandal[];
 }
 
 export const ChildModal: React.FC<ChildModalProps> = ({
@@ -15,6 +16,7 @@ export const ChildModal: React.FC<ChildModalProps> = ({
   onClose,
   onSave,
   childToEdit,
+  mandals = [],
 }) => {
   const [name, setName] = useState('');
   const [age, setAge] = useState(6);
@@ -24,6 +26,7 @@ export const ChildModal: React.FC<ChildModalProps> = ({
   const [eggIntake, setEggIntake] = useState(3);
   const [milkIntake, setMilkIntake] = useState<MilkIntake>('3-4 times');
   const [vegetableIntake, setVegetableIntake] = useState<VegetableIntake>('3-4 times a week');
+  const [mandalId, setMandalId] = useState<string>(mandals[0]?.id || 'mandal-1');
   const [ward, setWard] = useState('Ward 1 - School Tola');
   const [schoolGrade, setSchoolGrade] = useState('Class 1');
   const [guardianContact, setGuardianContact] = useState('');
@@ -39,6 +42,7 @@ export const ChildModal: React.FC<ChildModalProps> = ({
       setEggIntake(childToEdit.eggIntake);
       setMilkIntake(childToEdit.milkIntake);
       setVegetableIntake(childToEdit.vegetableIntake);
+      setMandalId(childToEdit.mandalId || mandals[0]?.id || 'mandal-1');
       setWard(childToEdit.ward || 'Ward 1 - School Tola');
       setSchoolGrade(childToEdit.schoolGrade || 'Class 1');
       setGuardianContact(childToEdit.guardianContact || '');
@@ -51,11 +55,12 @@ export const ChildModal: React.FC<ChildModalProps> = ({
       setEggIntake(3);
       setMilkIntake('3-4 times');
       setVegetableIntake('3-4 times a week');
+      setMandalId(mandals[0]?.id || 'mandal-1');
       setWard('Ward 1 - School Tola');
       setSchoolGrade('Class 1');
       setGuardianContact('');
     }
-  }, [childToEdit, isOpen]);
+  }, [childToEdit, isOpen, mandals]);
 
   if (!isOpen) return null;
 
@@ -69,7 +74,10 @@ export const ChildModal: React.FC<ChildModalProps> = ({
     eggIntake,
     milkIntake,
     vegetableIntake,
+    mandalId,
   });
+
+  const selectedMandalObj = mandals.find((m) => m.id === mandalId);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,6 +93,8 @@ export const ChildModal: React.FC<ChildModalProps> = ({
         eggIntake: Number(eggIntake),
         milkIntake,
         vegetableIntake,
+        mandalId,
+        mandalName: selectedMandalObj?.name || 'Kuppam Mandal',
         ward,
         schoolGrade,
         guardianContact: guardianContact.trim() || undefined,
@@ -195,6 +205,26 @@ export const ChildModal: React.FC<ChildModalProps> = ({
               </select>
             </div>
           </div>
+
+          {/* Assigned Mandal */}
+          {mandals.length > 0 && (
+            <div>
+              <label className="block text-xs font-bold text-[#1B2A18] uppercase tracking-wider mb-1">
+                Administrative Mandal *
+              </label>
+              <select
+                value={mandalId}
+                onChange={(e) => setMandalId(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-[#F9FAFB] border border-[#E0E7DB] rounded-xl text-sm text-[#1B2A18] focus:outline-none focus:ring-2 focus:ring-[#4A7C44]/20 focus:border-[#4A7C44]"
+              >
+                {mandals.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} ({m.district})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Height and Weight */}
           <div className="grid grid-cols-2 gap-3">

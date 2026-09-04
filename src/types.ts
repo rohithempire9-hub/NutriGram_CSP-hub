@@ -6,6 +6,17 @@ export type VegetableIntake = '3-4 times a week' | '1-2 times a week' | 'rarely'
 
 export type NutritionStatus = 'Good Nutrition' | 'Needs Improvement' | 'At Risk';
 
+export interface Mandal {
+  id: string;
+  name: string;
+  district: string;
+  supervisorName: string;
+  supervisorPhone: string;
+  anganwadiCount: number;
+  enrolledChildrenCount?: number;
+  notes?: string;
+}
+
 export interface ChildRecord {
   id: string;
   name: string;
@@ -16,6 +27,8 @@ export interface ChildRecord {
   eggIntake: number; // eggs per week
   milkIntake: MilkIntake;
   vegetableIntake: VegetableIntake;
+  mandalId: string;
+  mandalName?: string;
   ward?: string;
   schoolGrade?: string;
   guardianContact?: string;
@@ -48,3 +61,39 @@ export interface VillageStats {
   atRiskGirls: number;
   atRiskBoys: number;
 }
+
+export interface AuthUser {
+  id: string;
+  username: string;
+  name: string;
+  role: 'admin' | 'supervisor' | 'medical_officer' | 'viewer';
+  mandalJurisdiction?: string;
+  token?: string;
+}
+
+export interface FoodSuggestionItem {
+  id: string;
+  name: string;
+  localName?: string;
+  category: 'protein' | 'calcium' | 'iron_vitamins' | 'energy_dense' | 'balanced_meal';
+  targetDeficit: 'egg' | 'milk' | 'vegetable' | 'bmi' | 'general';
+  imageUrl: string;
+  nutritionHighlights: string[];
+  calories: string;
+  protein: string;
+  recommendedServing: string;
+  cookingGuideline: string;
+  anganwadiMealTip: string;
+}
+
+export type ActivePage =
+  | 'dashboard'
+  | 'records'
+  | 'child-details'
+  | 'register'
+  | 'bmi-score'
+  | 'food-suggestions'
+  | 'mandals'
+  | 'admin-login';
+
+export type FilterStatus = 'all' | 'good' | 'needs-improvement' | 'at-risk';
