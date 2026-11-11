@@ -20,7 +20,7 @@ const allowedOrigins = (process.env.FRONTEND_URL || process.env.APP_URL || "")
   .map((value) => value.trim().replace(/\/$/, ""))
   .filter(Boolean);
 
-const requiredEnv = ["MONGODB_URI", "JWT_SECRET", "ADMIN_USERNAME", "ADMIN_PASSWORD_HASH"];
+const requiredEnv = ["MONGODB_URI", "JWT_SECRET", "ADMIN_USERNAME", "ADMIN_PASSWORD_HASH", "FRONTEND_URL"];
 for (const key of requiredEnv) {
   if (!process.env[key]) {
     console.error(`Missing required environment variable: ${key}`);
@@ -33,6 +33,7 @@ if (process.env.JWT_SECRET.length < 32) {
 }
 
 app.disable("x-powered-by");
+app.set("trust proxy", 1);
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
@@ -212,7 +213,7 @@ function setSessionCookie(res, token) {
     "HttpOnly",
     "Path=/",
     "Max-Age=" + TOKEN_TTL_SECONDS,
-    "SameSite=None",
+    "SameSite=" + (isProduction ? "None" : "Lax"),
   ];
   if (isProduction) parts.push("Secure");
   res.setHeader("Set-Cookie", parts.join("; "));
