@@ -53,4 +53,4 @@ Do not commit `.env`, MongoDB credentials, the administrator password, or JWT se
 
 ## Important integration note
 
-The deployed frontend still needs its data/authentication layer switched from browser localStorage and demo accounts to these endpoints. Keep the API and frontend on HTTPS in production and configure the exact frontend origin in `FRONTEND_URL`.
+The React application in this branch is wired to the API for administrator login, child CRUD, and Mandal CRUD. Deploy the frontend with the Vite build environment variable `VITE_API_URL=https://<your-api-service>.onrender.com`. Configure the backend `FRONTEND_URL` to the exact deployed frontend origin, e.g. `https://nutrigram-csp-hub.onrender.com`. Keep both services on HTTPS. The four initial Mandals are inserted automatically on first backend start; sample child rows from the old browser-only demo are not copied into MongoDB. Export any browser-only records you need before switching to this branch.
