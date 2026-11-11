@@ -6,8 +6,7 @@ import {
   AuthUser,
   NutritionStatus,
 } from './types';
-import { INITIAL_CHILDREN } from './data/initialData';
-import { INITIAL_MANDALS } from './data/mandalData';
+import { getCurrentAdmin, getChildren, getMandals, createChild, updateChild, deleteChild, createMandal, updateMandal, deleteMandal, loginAdmin as apiLoginAdmin, logoutAdmin } from './lib/api';
 import { Navbar } from './components/Navbar';
 import { ChildModal } from './components/ChildModal';
 import { PresentationMode } from './components/PresentationMode';
@@ -22,10 +21,6 @@ import { FoodSuggestionsPage } from './pages/FoodSuggestionsPage';
 import { MandalsPage } from './pages/MandalsPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
 import { calculateVillageStats, analyzeChild } from './utils/nutritionCalculations';
-
-const LOCAL_STORAGE_KEY_CHILDREN = 'nutrigram_children_v1';
-const LOCAL_STORAGE_KEY_MANDALS = 'nutrigram_mandals_v1';
-const LOCAL_STORAGE_KEY_AUTH = 'nutrigram_auth_v1';
 
 export default function App() {
   // Page Navigation State
@@ -51,61 +46,13 @@ export default function App() {
     return 'dashboard';
   });
 
-  // Children State (Persistent via LocalStorage)
-  const [children, setChildren] = useState<ChildRecord[]>(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY_CHILDREN);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch (e) {
-      console.error('Error loading saved children records:', e);
-    }
-    return INITIAL_CHILDREN;
-  });
-
-  // Mandals State (Persistent via LocalStorage)
-  const [mandals, setMandals] = useState<Mandal[]>(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY_MANDALS);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch (e) {
-      console.error('Error loading saved mandals:', e);
-    }
-    return INITIAL_MANDALS;
-  });
-
-  // Auth User State (Persistent via LocalStorage)
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY_AUTH);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.error('Error loading auth user:', e);
-    }
-    // Default demo supervisor
-    return {
-      id: 'usr-sup-01',
-      username: 'supervisor.lakshmi',
-      name: 'Smt. Lakshmi Devi (Supervisor)',
-      role: 'supervisor',
-      mandalJurisdiction: 'Kuppam Mandal',
-      token: 'jwt-auth-session-valid',
-    };
-  });
+  // Data is loaded from MongoDB after the administrator session is verified.
+  const [children, setChildren] = useState<ChildRecord[]>([]);
+  const [mandals, setMandals] = useState<Mandal[]>([]);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
 
   // Auxiliary View States
-  const [selectedChildId, setSelectedChildId] = useState<string>(INITIAL_CHILDREN[0]?.id || 'ch-01');
+  const [selectedChildId, setSelectedChildId] = useState<string>('');
   const [initialMandalFilterForRecords, setInitialMandalFilterForRecords] = useState<string>('all');
   const [childToEdit, setChildToEdit] = useState<ChildRecord | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -142,99 +89,109 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  // Persist Children
+  // Restore the HttpOnly administrator session and load MongoDB records.
   useEffect(() => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEY_CHILDREN, JSON.stringify(children));
-    } catch (e) {
-      console.error('Error saving children:', e);
-    }
-  }, [children]);
-
-  // Persist Mandals
-  useEffect(() => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEY_MANDALS, JSON.stringify(mandals));
-    } catch (e) {
-      console.error('Error saving mandals:', e);
-    }
-  }, [mandals]);
-
-  // Persist Auth
-  useEffect(() => {
-    try {
-      if (currentUser) {
-        localStorage.setItem(LOCAL_STORAGE_KEY_AUTH, JSON.stringify(currentUser));
-      } else {
-        localStorage.removeItem(LOCAL_STORAGE_KEY_AUTH);
+    let cancelled = false;
+    (async () => {
+      try {
+        const user = await getCurrentAdmin();
+        if (cancelled) return;
+        setCurrentUser(user);
+        const [childRows, mandalRows] = await Promise.all([getChildren(), getMandals()]);
+        if (!cancelled) {
+          setChildren(childRows);
+          setMandals(mandalRows);
+          setSelectedChildId(childRows[0]?.id || '');
+        }
+      } catch {
+        if (!cancelled) {
+          setCurrentUser(null);
+          setChildren([]);
+          setMandals([]);
+        }
       }
-    } catch (e) {
-      console.error('Error saving auth:', e);
-    }
-  }, [currentUser]);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
-  // Handler: Save or update child
-  const handleSaveChild = (
+  // MongoDB-backed child and Mandal mutations.
+  const handleSaveChild = async (
     childData: Omit<ChildRecord, 'id' | 'createdAt'>,
     existingId?: string
   ) => {
-    if (existingId) {
-      setChildren((prev) =>
-        prev.map((c) =>
-          c.id === existingId
-            ? {
-                ...c,
-                ...childData,
-                updatedAt: new Date().toISOString(),
-              }
-            : c
-        )
-      );
-    } else {
-      const newChild: ChildRecord = {
-        ...childData,
-        id: `ch-${Date.now().toString().slice(-4)}`,
-        createdAt: new Date().toISOString(),
-      };
-      setChildren((prev) => [newChild, ...prev]);
-      setSelectedChildId(newChild.id);
+    try {
+      if (existingId) {
+        const saved = await updateChild(existingId, childData as Omit<ChildRecord, 'id' | 'createdAt'>);
+        setChildren((prev) => prev.map((child) => child.id === existingId ? saved : child));
+      } else {
+        const saved = await createChild(childData as Omit<ChildRecord, 'id' | 'createdAt'>);
+        setChildren((prev) => [saved, ...prev]);
+        setSelectedChildId(saved.id);
+      }
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Could not save the child record.');
     }
   };
 
-  // Handler: Delete child
-  const handleDeleteChild = (id: string) => {
-    setChildren((prev) => prev.filter((c) => c.id !== id));
-    if (selectedChildId === id) {
-      const remaining = children.filter((c) => c.id !== id);
-      if (remaining.length > 0) {
-        setSelectedChildId(remaining[0].id);
-      }
+  const handleDeleteChild = async (id: string) => {
+    try {
+      await deleteChild(id);
+      setChildren((prev) => {
+        const remaining = prev.filter((child) => child.id !== id);
+        if (selectedChildId === id) setSelectedChildId(remaining[0]?.id || '');
+        return remaining;
+      });
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Could not delete the child record.');
     }
   };
 
-  // Handler: Save Mandal
-  const handleSaveMandal = (mandal: Mandal) => {
-    setMandals((prev) => {
-      const exists = prev.some((m) => m.id === mandal.id);
-      if (exists) {
-        return prev.map((m) => (m.id === mandal.id ? mandal : m));
-      }
-      return [...prev, mandal];
-    });
+  const handleSaveMandal = async (mandal: Mandal) => {
+    try {
+      const exists = mandals.some((item) => item.id === mandal.id);
+      const saved = exists
+        ? await updateMandal(mandal.id, mandal)
+        : await createMandal(mandal);
+      setMandals((prev) => exists
+        ? prev.map((item) => item.id === saved.id ? saved : item)
+        : [...prev, saved]);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Could not save the Mandal.');
+    }
   };
 
-  // Handler: Delete Mandal
-  const handleDeleteMandal = (id: string) => {
-    setMandals((prev) => prev.filter((m) => m.id !== id));
+  const handleDeleteMandal = async (id: string) => {
+    try {
+      await deleteMandal(id);
+      setMandals((prev) => prev.filter((mandal) => mandal.id !== id));
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Could not delete the Mandal.');
+    }
   };
 
-  // Handler: Auth Login / Logout
-  const handleLogin = (user: AuthUser) => {
+  const handleLogin = async (user: AuthUser) => {
     setCurrentUser(user);
+    try {
+      const [childRows, mandalRows] = await Promise.all([getChildren(), getMandals()]);
+      setChildren(childRows);
+      setMandals(mandalRows);
+      setSelectedChildId(childRows[0]?.id || '');
+    } catch (error) {
+      setCurrentUser(null);
+      window.alert(error instanceof Error ? error.message : 'Could not load NutriGram data.');
+    }
   };
 
-  const handleLogout = () => {
-    setCurrentUser(null);
+  const handleLogout = async () => {
+    try {
+      await logoutAdmin();
+    } finally {
+      setCurrentUser(null);
+      setChildren([]);
+      setMandals([]);
+      setSelectedChildId('');
+      navigateTo('admin-login');
+    }
   };
 
   // Handler: Select child for detail or food suggestions
